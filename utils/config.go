@@ -1,7 +1,7 @@
 package utils
 
 const (
-	ServerHost  = "161.35.192.168:"
+	ServerHost  = "68.183.221.200:"
 	ProtocolTcp = "tcp"
 	Port        = "5672"
 )
