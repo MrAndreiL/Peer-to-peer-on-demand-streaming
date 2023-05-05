@@ -85,6 +85,15 @@ func HandleConnection(connection net.Conn) {
 	Close(connection)
 }
 
+func CreateThreadPool(numThreads, numTasks int) Pool {
+	pool, err := NewThreadPool(numThreads, numTasks)
+	if err != nil {
+		fmt.Println("Error when creating thread pool: ", err.Error())
+		os.Exit(1)
+	}
+	return pool
+}
+
 func Serve(listener net.Listener) {
 	for {
 		connection := Accept(listener)
