@@ -1,7 +1,9 @@
 package main
 
+import "Peer-to-peer-on-demand-streaming/utils"
+
 func main() {
-	OpenServer()
+	utils.OpenServer()
 
 	for {
 

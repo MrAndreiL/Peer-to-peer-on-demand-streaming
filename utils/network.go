@@ -94,6 +94,18 @@ func CreateThreadPool(numThreads, numTasks int) Pool {
 	return pool
 }
 
+func ManageServer() {
+	listener := Listen(ProtocolTcp, ServerHost+Port)
+
+	fmt.Println("Listening on:", ServerHost+Port)
+
+	Serve(listener)
+}
+
+func OpenServer() {
+	go ManageServer()
+}
+
 func Serve(listener net.Listener) {
 	for {
 		connection := Accept(listener)
