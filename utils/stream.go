@@ -67,7 +67,7 @@ func MediaToStream(pathToFile string) {
 			CreateDirectory(directory)
 			playlist := CreateStream(path, directory, fileName, SegmentLength)
 			WriteToFile(filepath.Dir(pathToFile), playlist+".m3u8")
-			DeleteFile(path)
+			// DeleteFile(path)
 		}
 		return nil
 	})
