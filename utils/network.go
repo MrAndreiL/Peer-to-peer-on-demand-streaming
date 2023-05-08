@@ -4,7 +4,9 @@ import (
 	"bufio"
 	"fmt"
 	"net"
+	"net/http"
 	"os"
+	"path/filepath"
 )
 
 func Listen(protocol, address string) net.Listener {
@@ -103,7 +105,39 @@ func ManageServer() {
 }
 
 func OpenServer() {
-	go ManageServer()
+	// Open Audio streaming server.
+	go ServeVideoAudio()
+}
+
+func ServeVideoAudio() {
+	AudioStream, err := filepath.Abs(AudioPathStream)
+	if err != nil {
+		fmt.Println("Error when getting abs path to stream directory: ", err.Error())
+		os.Exit(1)
+	}
+	audioServer := http.NewServeMux()
+	audioServer.Handle("/", addHeaders(http.FileServer(http.Dir(AudioStream))))
+	VideoStream, err := filepath.Abs(VideoPathStream)
+	if err != nil {
+		fmt.Println("Error when getting abs path to stream directory: ", err.Error())
+		os.Exit(1)
+	}
+	videoServer := http.NewServeMux()
+	videoServer.Handle("/", addHeaders(http.FileServer(http.Dir(VideoStream))))
+	go func() {
+		http.ListenAndServe(ServerHost+AudioPort, audioServer)
+	}()
+	go func() {
+		http.ListenAndServe(ServerHost+VideoPort, videoServer)
+	}()
+}
+
+// add CORS support.
+func addHeaders(h http.Handler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		h.ServeHTTP(w, r)
+	}
 }
 
 func Serve(listener net.Listener) {

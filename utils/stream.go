@@ -27,7 +27,7 @@ func CreateStream(inputFile, outputDir, fileName string, segmentDuration int) st
 		"-segment_time", "10", // all segments in the playlist
 		"-segment_list", fmt.Sprintf("%s/%s.m3u8", outputDir, fileName),
 		"-segment_format", "mpegts",
-		outputDir+"/"+fileName+"\\%03d.ts",
+		outputDir+"/"+fileName+"%03d.ts",
 	)
 
 	output, err := ffmpegCmd.CombinedOutput()
