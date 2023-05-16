@@ -2,9 +2,27 @@ package utils
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
 	"path/filepath"
+	"time"
 )
+
+var seededRand *rand.Rand = rand.New(rand.NewSource(time.Now().UnixNano()))
+
+func StringWithCharset(length int, charset string) string {
+	b := make([]byte, length+1)
+	first := false
+	for i := range b {
+		if first == false {
+			b[i] = '#'
+			first = true
+		} else {
+			b[i] = charset[seededRand.Intn(len(charset))]
+		}
+	}
+	return string(b)
+}
 
 func CreateDirectory(dir string) error {
 	// Create output directory. Test if it already exists.

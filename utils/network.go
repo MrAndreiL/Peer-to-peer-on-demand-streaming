@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 func Listen(protocol, address string) net.Listener {
@@ -55,7 +56,6 @@ func BuffReadFromNetwork(connection net.Conn) string {
 		fmt.Println("Error when reading from network: ", err.Error())
 		os.Exit(1)
 	}
-	fmt.Println("Received: ", data)
 	return data
 }
 
@@ -79,29 +79,30 @@ func BuffWriteToNetwork(connection net.Conn, message string) {
 	Flush(writer)
 }
 
+func ConnectToNetwork(connection net.Conn) {
+	BuffWriteToNetwork(connection, "connect\n")
+	publicAddress := connection.RemoteAddr().String()
+	privateAddress := strings.Trim(BuffReadFromNetwork(connection), "\n")
+	networkName := StringWithCharset(IdLength, Charset)
+	BuffWriteToNetwork(connection, networkName+"\n")
+	fmt.Println(publicAddress)
+	fmt.Println(privateAddress)
+	fmt.Println(networkName)
+}
+
 func HandleConnection(connection net.Conn) {
-	message := BuffReadFromNetwork(connection)
+	keepAlive := true
 
-	BuffWriteToNetwork(connection, message)
-
-	Close(connection)
-}
-
-func CreateThreadPool(numThreads, numTasks int) Pool {
-	pool, err := NewThreadPool(numThreads, numTasks)
-	if err != nil {
-		fmt.Println("Error when creating thread pool: ", err.Error())
-		os.Exit(1)
+	for keepAlive {
+		message := BuffReadFromNetwork(connection)
+		switch strings.Trim(message, "\n") {
+		case "connect":
+			ConnectToNetwork(connection)
+		default:
+			keepAlive = false
+		}
 	}
-	return pool
-}
-
-func ManageServer() {
-	listener := Listen(ProtocolTcp, ServerHost+Port)
-
-	fmt.Println("Listening on:", ServerHost+Port)
-
-	Serve(listener)
+	Close(connection)
 }
 
 func OpenServer() {
