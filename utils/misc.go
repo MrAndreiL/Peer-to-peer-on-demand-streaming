@@ -3,10 +3,27 @@ package utils
 import (
 	"fmt"
 	"math/rand"
+	"net"
 	"os"
 	"path/filepath"
 	"time"
 )
+
+type Peer struct {
+	publicAddress  string
+	privateAddress string
+	networkName    string
+	connection     net.Conn
+}
+
+func CreateNetworkPeer(public, private, name string, conn net.Conn) *Peer {
+	var peer Peer
+	peer.publicAddress = public
+	peer.privateAddress = private
+	peer.networkName = name
+	peer.connection = conn
+	return &peer
+}
 
 var seededRand *rand.Rand = rand.New(rand.NewSource(time.Now().UnixNano()))
 

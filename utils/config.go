@@ -1,8 +1,8 @@
 package utils
 
 const (
-	ServerHost = "68.183.221.200:"
-	// ServerHost      = "127.0.0.1:"
+	ServerHost      = "68.183.221.200:"
+	PeerHost        = "127.0.0.1:"
 	SuperPeer       = false
 	ProtocolTcp     = "tcp"
 	Port            = "5672"
@@ -18,7 +18,7 @@ const (
 	VideoPort       = "8082"
 	SegmentLength   = 10
 	SuperPeerPort   = "8083"
-	PeerPort        = 8080
+	PeerPort        = "8080"
 )
 
 const Charset = "abcdefghijklmnopqrstuvwxyz" +
