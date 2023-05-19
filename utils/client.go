@@ -68,7 +68,7 @@ func HolePunching(address string, listener net.Listener, connection net.Conn) {
 }
 
 func OpenPeer() {
-	connection := Dial(ProtocolTcp, PeerHost+SuperPeerPort)
+	connection := Dial(ProtocolTcp, ServerHost+SuperPeerPort)
 	// Open for listening.
 	listener := Listen(ProtocolTcp, connection.LocalAddr().String())
 	keepAlive := true
