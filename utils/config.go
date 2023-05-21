@@ -1,9 +1,10 @@
 package utils
 
 const (
-	ServerHost      = "68.183.221.200:"
+	// ServerHost      = "68.183.221.200:"
+	ServerHost      = "127.0.0.1:"
 	PeerHost        = "127.0.0.1:"
-	SuperPeer       = false
+	SuperPeer       = true
 	ProtocolTcp     = "tcp"
 	Port            = "5672"
 	Threads         = 3

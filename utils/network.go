@@ -233,6 +233,9 @@ func PeerManagement() {
 }
 
 func Serve(listener net.Listener) {
+	fmt.Println(MappingFileHash)
+	fmt.Println(MappingFilePath)
+	fmt.Println(MappingFileLength)
 	// opens up routine that deals with concurrent memory management.
 	go MemoryManagementRoutine()
 

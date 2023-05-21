@@ -9,6 +9,10 @@ import (
 	"time"
 )
 
+var MappingFileHash map[string]string
+var MappingFilePath map[string]string
+var MappingFileLength map[string]string
+
 type Peer struct {
 	publicAddress  string
 	privateAddress string
@@ -23,6 +27,12 @@ func CreateNetworkPeer(public, private, name string, conn net.Conn) *Peer {
 	peer.networkName = name
 	peer.connection = conn
 	return &peer
+}
+
+func SetFileMappings(fileHash, filePath, fileLength map[string]string) {
+	MappingFileHash = fileHash
+	MappingFilePath = filePath
+	MappingFileLength = fileLength
 }
 
 var seededRand *rand.Rand = rand.New(rand.NewSource(time.Now().UnixNano()))
