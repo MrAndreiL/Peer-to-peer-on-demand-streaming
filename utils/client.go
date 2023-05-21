@@ -37,6 +37,7 @@ func SearchForConnection(connection net.Conn, listener net.Listener) {
 		fmt.Println("Cannot convert the received number of peers.")
 		os.Exit(1)
 	}
+	var swarm []net.Conn
 	// Announce the superpeer to start sending.
 	BuffWriteToNetwork(connection, fmt.Sprint(p)+"\n")
 	for i := 0; i < p; i++ {
@@ -46,8 +47,22 @@ func SearchForConnection(connection net.Conn, listener net.Listener) {
 		BuffWriteToNetwork(connection, "ok\n")
 		fmt.Println("Starting hole punching from: ", connection.LocalAddr().String())
 		HolePunching(address, listener, connection)
+		// Upon successful hole punching, save the connection in a list.
+		punchConn := punchConnection
+		swarm = append(swarm, punchConn)
 	}
-	fmt.Println(BuffReadFromNetwork(punchConnection))
+	// After hole punching, start swarm protocol.
+	Swarm(swarm, "lane.mp4")
+}
+
+func Swarm(swarm []net.Conn, fileName string) {
+	// 1. Ask first peer in connection for the total
+	// number of files to be transferred.
+	BuffWriteToNetwork(swarm[0], "number\n")
+	BuffReadFromNetwork(swarm[0])
+	BuffWriteToNetwork(swarm[0], fileName+"\n")
+	fileLength := strings.Trim(BuffReadFromNetwork(swarm[0]), "\n")
+	fmt.Println(fileLength)
 }
 
 func HolePunching(address string, listener net.Listener, connection net.Conn) {
@@ -64,7 +79,21 @@ func HolePunching(address string, listener net.Listener, connection net.Conn) {
 		time.Sleep(1 * time.Second)
 	}
 	fmt.Println("Hole punched, connection established!")
-	BuffWriteToNetwork(punchConnection, "mesaj\n")
+}
+
+func Swarming(connection net.Conn) {
+	// Receive swarming request from peer.
+	keepAlive := true
+	for keepAlive {
+		message := strings.Trim(BuffReadFromNetwork(connection), "\n")
+		if message == "number" {
+			BuffWriteToNetwork(connection, "ok\n")
+			// Receive media file name to be transferred.
+			fileName := strings.Trim(BuffReadFromNetwork(connection), "\n")
+			// Send back the number of files required for full transfer.
+			BuffWriteToNetwork(connection, MappingFileLength[fileName]+"\n")
+		}
+	}
 }
 
 func OpenPeer() {
@@ -97,7 +126,7 @@ func OpenPeer() {
 			BuffWriteToNetwork(connection, "ok\n")
 			fmt.Println("Starting hole punching...")
 			HolePunching(address, listener, connection)
-			fmt.Println(BuffReadFromNetwork(punchConnection))
+			go Swarming(punchConnection)
 		}
 	}
 	Close(connection)
