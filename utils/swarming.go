@@ -64,62 +64,92 @@ func fillString(returnString string, toLength int) string {
 	return returnString
 }
 
-func SendFile(filePath string, connection net.Conn) {
-	// 1. Open file to be sent.
-	file, err := os.Open(filePath)
-	if err != nil {
-		fmt.Println("Error when opening file: ", err.Error())
-		os.Exit(1)
-	}
-	fileInfo, err := file.Stat()
-	if err != nil {
-		fmt.Println("Error when extracting file info: ", err.Error())
-		os.Exit(1)
-	}
-	fileSize := fillString(strconv.FormatInt(fileInfo.Size(), 10), 10)
-	fileName := fillString(fileInfo.Name(), 64)
-	fmt.Println("Sending filename and filesize!")
-	connection.Write([]byte(fileSize))
-	connection.Write([]byte(fileName))
-	sendBuffer := make([]byte, BufferSize)
-	fmt.Println("Start sending file!")
-	for {
-		_, err := file.Read(sendBuffer)
-		if err == io.EOF {
-			break
+func SendFiles(connection net.Conn, playlist []string) {
+	for i := 0; i < len(playlist); i++ {
+		file, err := os.Open(playlist[i])
+		if err != nil {
+			fmt.Println("Error when opening file: ", err.Error())
+			os.Exit(1)
 		}
-		connection.Write(sendBuffer)
+		fileInfo, err := file.Stat()
+		if err != nil {
+			fmt.Println("Error when extracting file info: ", err.Error())
+			os.Exit(1)
+		}
+		fileSize := fillString(fmt.Sprint(fileInfo.Size()), 10)
+		fileName := fillString(fileInfo.Name(), 64)
+		fmt.Println("Sending filename and filesize!")
+		connection.Write([]byte(fileSize))
+		connection.Write([]byte(fileName))
+		file.Close()
 	}
-	fmt.Println("File has been sent!")
+	for i := 0; i < len(playlist); i++ {
+		file, err := os.Open(playlist[i])
+		if err != nil {
+			fmt.Println("Error when opening file: ", err.Error())
+			os.Exit(1)
+		}
+		sendBuffer := make([]byte, BufferSize)
+		fmt.Println("Start sending file!")
+		for {
+			_, err := file.Read(sendBuffer)
+			if err == io.EOF {
+				break
+			}
+			connection.Write(sendBuffer)
+		}
+		fmt.Println("File has been sent!")
+		file.Close()
+	}
+	fmt.Println("Sending done!")
 }
 
-func ReceiveFile(path string, connection net.Conn) string {
-	bufferFileName := make([]byte, 64)
-	bufferFileSize := make([]byte, 10)
+func ReceiveFiles(path string, connection net.Conn, length int) {
+	var files []string
+	var lengths []int64
+	for i := 0; i < length; i++ {
+		bufferFileName := make([]byte, 64)
+		bufferFileSize := make([]byte, 10)
 
-	connection.Read(bufferFileSize)
-	fileSize, _ := strconv.ParseInt(strings.Trim(string(bufferFileSize), ":"), 10, 64)
-
-	connection.Read(bufferFileName)
-	fileName := strings.Trim(string(bufferFileName), ":")
-
-	newFile, err := os.Create(path + fileName)
-	if err != nil {
-		fmt.Println("Error when creating new file: ", err.Error())
-		os.Exit(1)
-	}
-	defer newFile.Close()
-
-	var receivedBytes int64
-	for {
-		if (fileSize - receivedBytes) < BufferSize {
-			io.CopyN(newFile, connection, (fileSize - receivedBytes))
-			connection.Read(make([]byte, (receivedBytes+BufferSize)-fileSize))
-			break
+		connection.Read(bufferFileSize)
+		fileSize, err := strconv.ParseInt(strings.Trim(string(bufferFileSize), ":"), 10, 64)
+		if err != nil {
+			fmt.Println(err.Error())
+			os.Exit(1)
 		}
-		io.CopyN(newFile, connection, BufferSize)
-		receivedBytes += BufferSize
+
+		connection.Read(bufferFileName)
+		fileName := strings.Trim(string(bufferFileName), ":")
+		fmt.Println(fileName, fileSize)
+		files = append(files, fileName)
+		lengths = append(lengths, fileSize)
 	}
-	fmt.Println("File received successfully!")
-	return path + fileName
+	for i := 0; i < length; i++ {
+		newFile, err := os.Create(path + files[i])
+		if err != nil {
+			fmt.Println("Error when creating new file: ", err.Error())
+			os.Exit(1)
+		}
+		defer newFile.Close()
+		var receivedBytes int64 = 0
+		for {
+			if (lengths[i] - receivedBytes) < BufferSize {
+				io.CopyN(newFile, connection, (lengths[i] - receivedBytes))
+				connection.Read(make([]byte, (receivedBytes+BufferSize)-lengths[i]))
+				break
+			}
+			io.CopyN(newFile, connection, BufferSize)
+			receivedBytes += BufferSize
+		}
+		fmt.Println("File received successfully!")
+	}
+	fmt.Println("Swarming accomplished!")
+}
+
+func ForwardSwarming(playlist []string, position int, connection net.Conn) {
+	var lista []string
+	for i := position; i < len(playlist); i++ {
+		lista = append(lista, playlist[i])
+	}
+	SendFiles(connection, lista)
 }

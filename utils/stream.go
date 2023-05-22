@@ -75,7 +75,7 @@ func MediaToStream(pathToFile string) {
 
 func DeleteFile(path string) {
 	if err := os.Remove(path); err != nil {
-		fmt.Println("Error deleting raw file")
+		fmt.Println("Error deleting raw file: ", err.Error())
 		os.Exit(1)
 	}
 }

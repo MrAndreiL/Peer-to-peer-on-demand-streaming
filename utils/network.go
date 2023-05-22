@@ -62,7 +62,6 @@ func Close(connection net.Conn) {
 
 	if err != nil {
 		fmt.Println("Error when closing connection: ", err.Error())
-		os.Exit(1)
 	}
 }
 
@@ -71,7 +70,6 @@ func BuffReadFromNetwork(connection net.Conn) string {
 
 	if err != nil {
 		fmt.Println("Error when reading from network: ", err.Error())
-		os.Exit(1)
 	}
 	return string(data)
 }
@@ -81,7 +79,6 @@ func Flush(writer *bufio.Writer) {
 
 	if err != nil {
 		fmt.Println("Error when flushing data to network: ", err.Error())
-		os.Exit(1)
 	}
 }
 
@@ -91,7 +88,6 @@ func BuffWriteToNetwork(connection net.Conn, message string) {
 	_, err := writer.WriteString(message)
 	if err != nil {
 		fmt.Println("Error when writing to network: ", err.Error())
-		os.Exit(1)
 	}
 	Flush(writer)
 }

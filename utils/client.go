@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"math/rand"
 	"net"
 	"os"
 	"strconv"
@@ -63,14 +64,59 @@ func Swarm(swarm []net.Conn, fileName, mediaType string) {
 	BuffWriteToNetwork(swarm[0], fileName+"\n")
 	fileLength := strings.Trim(BuffReadFromNetwork(swarm[0]), "\n")
 	fmt.Println(fileLength)
-	// 2. Ask the 'leading peer' for the playlist file.
-	BuffWriteToNetwork(swarm[0], "first\n")
-	BuffReadFromNetwork(swarm[0])
-	BuffWriteToNetwork(swarm[0], fileName+"\n")
 	// Create directory in appropiate place.
-	pathToNewDir := NewMediaDirectory(fileName+"test", mediaType)
-	// Receive playlist file.
-	fmt.Println(ReceiveFile(pathToNewDir, swarm[0]))
+	pathToNewDir := NewMediaDirectory(fileName, mediaType)
+	fmt.Println(pathToNewDir)
+	// 2. Initiate full transfer.
+	for i := 0; i < len(swarm); i++ {
+		go Transfer(swarm[i], pathToNewDir, mediaType, fileName, fileLength, i)
+	}
+	Streamfy()
+}
+
+func Transfer(connection net.Conn, path, mediaType, fileName, length string, index int) {
+	// 1. Send "transfer" initiation.
+	BuffWriteToNetwork(connection, "transfer\n")
+	BuffReadFromNetwork(connection)
+	BuffWriteToNetwork(connection, fileName+"\n")
+	BuffReadFromNetwork(connection)
+	// 2. Send mode type for transfer (forwards/backwards/both).
+	if index == 0 {
+		// first peer forwards = full transfer.
+		BuffWriteToNetwork(connection, "forward\n")
+		BuffReadFromNetwork(connection)
+		// send start position.
+		BuffWriteToNetwork(connection, "1\n")
+	} else if index == 1 {
+		// seconds peer backwards = full transfer.
+		BuffWriteToNetwork(connection, "backwards\n")
+		BuffReadFromNetwork(connection)
+		// send start position.
+		BuffWriteToNetwork(connection, length+"\n")
+	} else {
+		// All other peers receive both mode.
+		BuffWriteToNetwork(connection, "both\n")
+		BuffReadFromNetwork(connection)
+		// send start position.
+		l, err := strconv.Atoi(length)
+		if err != nil {
+			fmt.Println("Error when converting: ", err.Error())
+			os.Exit(1)
+		}
+		l = l + 1
+		randomPosition := rand.Intn(l-2) + 2
+		BuffWriteToNetwork(connection, fmt.Sprint(randomPosition)+"\n")
+	}
+	// 3. Start swarming.
+	fmt.Println("Start swarming")
+	l, err := strconv.Atoi(length)
+	if err != nil {
+		fmt.Println("Error when converting: ", err.Error())
+		os.Exit(1)
+	}
+	ReceiveFiles(path, connection, l)
+	fmt.Println("Swarming successful!")
+	connection.Close()
 }
 
 func HolePunching(address string, listener net.Listener, connection net.Conn) {
@@ -101,13 +147,25 @@ func Swarming(connection net.Conn) {
 			// Send back the number of files required for full transfer.
 			BuffWriteToNetwork(connection, MappingFileLength[fileName]+"\n")
 		}
-		if message == "first" {
+		if message == "transfer" {
+			fmt.Println("Preparing to transfer HLS files")
 			BuffWriteToNetwork(connection, "ok\n")
-			// Receive media file.
+			// Recevie media file requested.
 			fileName := strings.Trim(BuffReadFromNetwork(connection), "\n")
+			fmt.Println(fileName)
+			BuffWriteToNetwork(connection, "ok\n")
 			playlist := FilesPathsListing(fileName)
-			// Send playlist file.
-			SendFile(playlist[1], connection)
+			// Receive mode type for transfer (forward/backwards/both)
+			mode := strings.Trim(BuffReadFromNetwork(connection), "\n")
+			fmt.Println(mode)
+			BuffWriteToNetwork(connection, "ok\n")
+			position := strings.Trim(BuffReadFromNetwork(connection), "\n")
+			pos, _ := strconv.Atoi(position)
+			if mode == "forward" {
+				ForwardSwarming(playlist, pos, connection)
+				connection.Close()
+				keepAlive = false
+			}
 		}
 	}
 }
