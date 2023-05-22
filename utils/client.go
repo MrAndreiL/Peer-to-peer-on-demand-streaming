@@ -52,10 +52,10 @@ func SearchForConnection(connection net.Conn, listener net.Listener) {
 		swarm = append(swarm, punchConn)
 	}
 	// After hole punching, start swarm protocol.
-	Swarm(swarm, "lane.mp4")
+	Swarm(swarm, "lane.mp4", "video")
 }
 
-func Swarm(swarm []net.Conn, fileName string) {
+func Swarm(swarm []net.Conn, fileName, mediaType string) {
 	// 1. Ask first peer in connection for the total
 	// number of files to be transferred.
 	BuffWriteToNetwork(swarm[0], "number\n")
@@ -63,6 +63,14 @@ func Swarm(swarm []net.Conn, fileName string) {
 	BuffWriteToNetwork(swarm[0], fileName+"\n")
 	fileLength := strings.Trim(BuffReadFromNetwork(swarm[0]), "\n")
 	fmt.Println(fileLength)
+	// 2. Ask the 'leading peer' for the playlist file.
+	BuffWriteToNetwork(swarm[0], "first\n")
+	BuffReadFromNetwork(swarm[0])
+	BuffWriteToNetwork(swarm[0], fileName+"\n")
+	// Create directory in appropiate place.
+	pathToNewDir := NewMediaDirectory(fileName+"test", mediaType)
+	// Receive playlist file.
+	fmt.Println(ReceiveFile(pathToNewDir, swarm[0]))
 }
 
 func HolePunching(address string, listener net.Listener, connection net.Conn) {
@@ -92,6 +100,14 @@ func Swarming(connection net.Conn) {
 			fileName := strings.Trim(BuffReadFromNetwork(connection), "\n")
 			// Send back the number of files required for full transfer.
 			BuffWriteToNetwork(connection, MappingFileLength[fileName]+"\n")
+		}
+		if message == "first" {
+			BuffWriteToNetwork(connection, "ok\n")
+			// Receive media file.
+			fileName := strings.Trim(BuffReadFromNetwork(connection), "\n")
+			playlist := FilesPathsListing(fileName)
+			// Send playlist file.
+			SendFile(playlist[1], connection)
 		}
 	}
 }
