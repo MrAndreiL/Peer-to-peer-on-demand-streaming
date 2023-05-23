@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"net"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -53,7 +54,7 @@ func SearchForConnection(connection net.Conn, listener net.Listener) {
 		swarm = append(swarm, punchConn)
 	}
 	// After hole punching, start swarm protocol.
-	Swarm(swarm, "lane.mp4", "video")
+	Swarm(swarm, "need.mp3", "audio")
 }
 
 func Swarm(swarm []net.Conn, fileName, mediaType string) {
@@ -72,6 +73,9 @@ func Swarm(swarm []net.Conn, fileName, mediaType string) {
 		go Transfer(swarm[i], pathToNewDir, mediaType, fileName, fileLength, i)
 	}
 	Streamfy()
+	// 3. Upon successful swarming, open HLS server.
+	playlistFile := strings.Trim(fileName, filepath.Ext(fileName)) + ".m3u8"
+	StartStream(pathToNewDir, playlistFile)
 }
 
 func Transfer(connection net.Conn, path, mediaType, fileName, length string, index int) {
@@ -163,9 +167,13 @@ func Swarming(connection net.Conn) {
 			pos, _ := strconv.Atoi(position)
 			if mode == "forward" {
 				ForwardSwarming(playlist, pos, connection)
-				connection.Close()
-				keepAlive = false
+			} else if mode == "backwards" {
+				BackwardsSwarming(playlist, pos, connection)
+			} else {
+				BidirectionalSwarming(playlist, pos, connection)
 			}
+			connection.Close()
+			keepAlive = false
 		}
 	}
 }

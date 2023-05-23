@@ -153,3 +153,22 @@ func ForwardSwarming(playlist []string, position int, connection net.Conn) {
 	}
 	SendFiles(connection, lista)
 }
+
+func BackwardsSwarming(playlist []string, position int, connection net.Conn) {
+	var lista []string
+	for i := position; i >= 1; i-- {
+		lista = append(lista, playlist[i])
+	}
+	SendFiles(connection, lista)
+}
+
+func BidirectionalSwarming(playlist []string, position int, connection net.Conn) {
+	var lista []string
+	for i := position; i < len(playlist); i++ {
+		lista = append(lista, playlist[i])
+	}
+	for i := position - 1; i >= 1; i-- {
+		lista = append(lista, playlist[i])
+	}
+	SendFiles(connection, lista)
+}
