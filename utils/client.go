@@ -54,7 +54,7 @@ func SearchForConnection(connection net.Conn, listener net.Listener) {
 		swarm = append(swarm, punchConn)
 	}
 	// After hole punching, start swarm protocol.
-	Swarm(swarm, "need.mp3", "audio")
+	Swarm(swarm, "lane.mp4", "video")
 }
 
 func Swarm(swarm []net.Conn, fileName, mediaType string) {
@@ -179,12 +179,15 @@ func Swarming(connection net.Conn) {
 }
 
 func OpenPeer() {
-	connection := ReuseDial(ProtocolTcp, ":", ServerHost+SuperPeerPort)
+	fmt.Println("Application starting...")
+	fmt.Println("Listing all available superpeers...")
+	fmt.Println("1)" + Server1Host + SuperPeerPort)
+	fmt.Println("2)" + Server2Host + SuperPeerPort)
+	address := Clustering()
+	connection := ReuseDial(ProtocolTcp, ":", address)
 	// Open for listening.
-	fmt.Println(connection.LocalAddr().String())
 	listener := Listen(ProtocolTcp, connection.LocalAddr().String())
 	keepAlive := true
-	fmt.Println("Dialing the superpeer...")
 	BuffWriteToNetwork(connection, "connect\n")
 	for keepAlive {
 		message := strings.Trim(BuffReadFromNetwork(connection), "\n")
@@ -212,4 +215,40 @@ func OpenPeer() {
 		}
 	}
 	Close(connection)
+}
+
+func Clustering() string {
+	// Dialing first cluster superpeer.
+
+	fmt.Println("Dialing first superpeer...")
+	connection := ReuseDial(ProtocolTcp, ":", Server1Host+SuperPeerPort)
+	BuffWriteToNetwork(connection, "clustering\n")
+	l := strings.Trim(BuffReadFromNetwork(connection), "\n")
+	fmt.Println("First cluster has " + l + " connected peers.")
+	connection.Close()
+	load1, err := strconv.Atoi(l)
+	if err != nil {
+		fmt.Println("Failure when converting: ", err.Error())
+		os.Exit(1)
+	}
+
+	fmt.Println("Dialing second superpeer...")
+	connection = ReuseDial(ProtocolTcp, ":", Server2Host+SuperPeerPort)
+	BuffWriteToNetwork(connection, "clustering\n")
+	l = strings.Trim(BuffReadFromNetwork(connection), "\n")
+	fmt.Println("Second cluster has " + l + " connected peers.")
+	connection.Close()
+	load2, err := strconv.Atoi(l)
+	if err != nil {
+		fmt.Println("Failure when converting: ", err.Error())
+		os.Exit(1)
+	}
+
+	if load1 >= load2 {
+		fmt.Println("Connecting to first superpeer cluster...")
+		return (Server1Host + SuperPeerPort)
+	} else {
+		fmt.Println("Connecting to second superpeer cluster...")
+		return (Server2Host + SuperPeerPort)
+	}
 }

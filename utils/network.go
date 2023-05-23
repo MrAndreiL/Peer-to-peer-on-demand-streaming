@@ -139,6 +139,10 @@ func HandleConnection(connection net.Conn) {
 			BuffWriteToNetwork(connection, connections[0].publicAddress+"\n")
 			BuffReadFromNetwork(connection)
 		}
+		if message == "clustering" {
+			BuffWriteToNetwork(connection, fmt.Sprint(len(connections))+"\n")
+			keepAlive = false
+		}
 	}
 	Close(connection)
 }
