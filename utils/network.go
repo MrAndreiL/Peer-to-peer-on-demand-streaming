@@ -138,7 +138,7 @@ func HandleConnection(connection net.Conn) {
 			SendAllPeersToOne(connection)
 		}
 		if message == "pair" {
-			BuffWriteToNetwork(connection, connections[0].publicAddress+"\n")
+			BuffWriteToNetwork(connection, connections[len(connections)-1].publicAddress+"\n")
 			BuffReadFromNetwork(connection)
 		}
 		if message == "clustering" {
@@ -258,7 +258,7 @@ func PeerManagement() {
 		if len(connections) >= 2 {
 			// To A. -> TODO
 			fmt.Println("test")
-			BuffWriteToNetwork(connections[1].connection, "found\n")
+			BuffWriteToNetwork(connections[len(connections)-1].connection, "found\n")
 
 			BuffWriteToNetwork(connections[0].connection, "pair\n")
 			break
