@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/libp2p/go-reuseport"
@@ -14,6 +15,7 @@ var peerConnects = make(chan *Peer, 3)     // Peer connection management channel
 var peerDisconnects = make(chan *Peer, 3)  // Peer disconnection management channel.
 var managementShutdown = make(chan string) // channel to signal management cleanup
 var connections []*Peer
+var mediaList = make(chan []string, 3)
 
 func Listen(protocol, address string) net.Listener {
 	listener, err := reuseport.Listen(protocol, address)
@@ -112,7 +114,7 @@ func SendAllPeersToOne(connection net.Conn) {
 	BuffWriteToNetwork(connection, "1\n")
 	BuffReadFromNetwork(connection)
 	// Send peer info.
-	BuffWriteToNetwork(connection, connections[1].publicAddress+"\n")
+	BuffWriteToNetwork(connection, connections[0].publicAddress+"\n")
 	fmt.Println(BuffReadFromNetwork(connection))
 }
 
@@ -143,49 +145,79 @@ func HandleConnection(connection net.Conn) {
 			BuffWriteToNetwork(connection, fmt.Sprint(len(connections))+"\n")
 			keepAlive = false
 		}
+		if message == "search" {
+			ClusterSearch(connection)
+		}
+		if message == "listing" {
+			BuffWriteToNetwork(connection, "ok\n")
+			v := strings.Trim(BuffReadFromNetwork(connection), "\n")
+			nr, err := strconv.Atoi(v)
+			if err != nil {
+				fmt.Println(err)
+				os.Exit(1)
+			}
+			// Read all nr lines and put into array.
+			var media []string
+			for i := 0; i < nr; i++ {
+				val := strings.Trim(BuffReadFromNetwork(connection), "\n")
+				media = append(media, val)
+				fmt.Println(media)
+				BuffWriteToNetwork(connection, "ok\n")
+			}
+			fmt.Println("Sending into channel")
+			mediaList <- media
+		}
+		if message == "find" {
+			PeerManagement()
+		}
 	}
 	Close(connection)
 }
 
-/*
-func OpenServer() {
-	// Open Audio streaming server.
-	go ServeVideoAudio()
+func InList(element string, list []string) bool {
+	if len(list) == 0 {
+		return false
+	}
+	for i := 0; i < len(list); i++ {
+		if list[i] == element {
+			return true
+		}
+	}
+	return false
 }
-*/
-/*
-	func ServeVideoAudio() {
-		AudioStream, err := filepath.Abs(AudioPathStream)
-		if err != nil {
-			fmt.Println("Error when getting abs path to stream directory: ", err.Error())
-			os.Exit(1)
-		}
-		audioServer := http.NewServeMux()
 
-		VideoStream, err := filepath.Abs(VideoPathStream)
-		if err != nil {
-			fmt.Println("Error when getting abs path to stream directory: ", err.Error())
-			os.Exit(1)
-		}
-		videoServer := http.NewServeMux()
-		videoServer.Handle("/", addHeaders(http.FileServer(http.Dir(VideoStream))))
-		go func() {
-			http.ListenAndServe(ServerHost+AudioPort, audioServer)
-		}()
-		go func() {
-			http.ListenAndServe(ServerHost+VideoPort, videoServer)
-		}()
-	}
-
-// add CORS support.
-
-	func addHeaders(h http.Handler) http.HandlerFunc {
-		return func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Access-Control-Allow-Origin", "*")
-			h.ServeHTTP(w, r)
+func ClusterSearch(connection net.Conn) {
+	fmt.Println("Cluster searching...")
+	// Send "list" to all peers which are not current connection.
+	var response []string
+	for i := 0; i < len(connections); i++ {
+		if connections[i].connection != connection {
+			BuffWriteToNetwork(connections[i].connection, "list\n")
+			fmt.Println("Test")
+			// Wait on channel.
+			select {
+			case media := <-mediaList:
+				for i := 0; i < len(media); i++ {
+					if InList(media[i], response) == false {
+						response = append(response, media[i])
+					}
+				}
+				break
+			}
 		}
 	}
-*/
+	BuffWriteToNetwork(connection, "listing\n")
+	BuffReadFromNetwork(connection)
+	BuffWriteToNetwork(connection, fmt.Sprint(len(response))+"\n")
+	BuffReadFromNetwork(connection)
+	fmt.Println("sending")
+	for i := 0; i < len(response); i++ {
+		BuffWriteToNetwork(connection, response[i]+"\n")
+		BuffReadFromNetwork(connection)
+	}
+	fmt.Println("out")
+}
+
 func FindPeerIndex(peer *Peer, connections []*Peer) int {
 	for i, p := range connections {
 		if p.networkName == peer.networkName {
@@ -225,19 +257,19 @@ func PeerManagement() {
 	for {
 		if len(connections) >= 2 {
 			// To A. -> TODO
-			BuffWriteToNetwork(connections[0].connection, "found\n")
+			fmt.Println("test")
+			BuffWriteToNetwork(connections[1].connection, "found\n")
 
-			BuffWriteToNetwork(connections[1].connection, "pair\n")
+			BuffWriteToNetwork(connections[0].connection, "pair\n")
 			break
 		}
 	}
 }
-
 func Serve(listener net.Listener) {
 	// opens up routine that deals with concurrent memory management.
 	go MemoryManagementRoutine()
 
-	go PeerManagement()
+	// go PeerManagement()
 
 	for {
 		connection := Accept(listener)

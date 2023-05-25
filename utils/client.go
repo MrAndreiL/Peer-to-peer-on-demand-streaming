@@ -13,6 +13,9 @@ import (
 
 var networkName string
 var punchConnection net.Conn = nil
+var mediaChannel = make(chan []string, 3)
+var toSearch string
+var typeMedia string
 
 func ConnectionLogin(connection net.Conn) {
 	// Send private address.
@@ -54,7 +57,7 @@ func SearchForConnection(connection net.Conn, listener net.Listener) {
 		swarm = append(swarm, punchConn)
 	}
 	// After hole punching, start swarm protocol.
-	Swarm(swarm, "lane.mp4", "video")
+	Swarm(swarm, toSearch, typeMedia)
 }
 
 func Swarm(swarm []net.Conn, fileName, mediaType string) {
@@ -74,7 +77,7 @@ func Swarm(swarm []net.Conn, fileName, mediaType string) {
 	}
 	Streamfy()
 	// 3. Upon successful swarming, open HLS server.
-	playlistFile := strings.Trim(fileName, filepath.Ext(fileName)) + ".m3u8"
+	playlistFile := strings.TrimSuffix(fileName, filepath.Ext(fileName)) + ".m3u8"
 	StartStream(pathToNewDir, playlistFile)
 }
 
@@ -187,8 +190,10 @@ func OpenPeer() {
 	connection := ReuseDial(ProtocolTcp, ":", address)
 	// Open for listening.
 	listener := Listen(ProtocolTcp, connection.LocalAddr().String())
+	// Open player.
 	keepAlive := true
 	BuffWriteToNetwork(connection, "connect\n")
+	go Player(connection)
 	for keepAlive {
 		message := strings.Trim(BuffReadFromNetwork(connection), "\n")
 		if message == "connect" {
@@ -213,8 +218,88 @@ func OpenPeer() {
 			HolePunching(address, listener, connection)
 			go Swarming(punchConnection)
 		}
+		if message == "list" {
+			fmt.Println("Listing")
+			BuffWriteToNetwork(connection, "listing\n")
+			BuffReadFromNetwork(connection)
+			BuffWriteToNetwork(connection, fmt.Sprint(len(MappingFileHash))+"\n")
+			fmt.Println("length")
+			for key := range MappingFileHash {
+				BuffWriteToNetwork(connection, key+"\n")
+				fmt.Println(key)
+				fmt.Println(BuffReadFromNetwork(connection))
+			}
+			fmt.Println("sent")
+		}
+		if message == "listing" {
+			BuffWriteToNetwork(connection, "ok\n")
+			v := strings.Trim(BuffReadFromNetwork(connection), "\n")
+			nr, err := strconv.Atoi(v)
+			if err != nil {
+				fmt.Println(err)
+				os.Exit(1)
+			}
+			fmt.Println(nr)
+			var media []string
+			BuffWriteToNetwork(connection, "ok\n")
+			for i := 0; i < nr; i++ {
+				media = append(media, strings.Trim(BuffReadFromNetwork(connection), "\n"))
+				BuffWriteToNetwork(connection, "ok\n")
+			}
+			mediaList <- media
+		}
 	}
 	Close(connection)
+}
+
+func Player(connection net.Conn) {
+	keepAlive := true
+	for keepAlive {
+		// 1. Tell the player to choose between searching and deep searching.
+		fmt.Println("1) Search")
+		fmt.Println("2) Deep Search")
+		var response string
+		fmt.Scanln(&response)
+		if response == "1" {
+			fmt.Println("Searching")
+			Search(connection)
+		} else if response == "2" {
+			fmt.Println("Deep Searching...")
+			Search(connection)
+		} else if response == "exit" {
+			BuffWriteToNetwork(connection, "goodbye\n")
+			keepAlive = false
+		} else {
+			fmt.Println("Please choose option 1 or option 2.")
+		}
+	}
+}
+
+func Search(connection net.Conn) {
+	BuffWriteToNetwork(connection, "search\n")
+	select {
+	case media := <-mediaList:
+		fmt.Println("yes")
+		for i := 0; i < len(media); i++ {
+			fmt.Println(fmt.Sprint(i+1) + ") " + media[i])
+		}
+		var response string
+		fmt.Scanln(&response)
+		nr, err := strconv.Atoi(response)
+		if err != nil {
+			fmt.Println(err.Error())
+			os.Exit(1)
+		}
+		fmt.Println(nr)
+		toSearch = media[nr-1]
+		if filepath.Ext(media[nr-1]) == ".mp4" {
+			typeMedia = "video"
+		} else {
+			typeMedia = "audio"
+		}
+		BuffWriteToNetwork(connection, "find\n")
+		break
+	}
 }
 
 func Clustering() string {
@@ -244,7 +329,7 @@ func Clustering() string {
 		os.Exit(1)
 	}
 
-	if load1 >= load2 {
+	if load1 <= load2 {
 		fmt.Println("Connecting to first superpeer cluster...")
 		return (Server1Host + SuperPeerPort)
 	} else {
